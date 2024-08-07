@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>前端上传</title>
+	<script src="https://cdn.jsdelivr.net/npm/axios@1.7.3/dist/axios.min.js"></script>
+</head>
+<body>
+<script src="./lib/upload.js"></script>
+<button id="download_btn">download file</button>
+<input type="file" id="upload_trigger" />
+<progress id="progressBar" value="0" max="100"></progress>
+<script>
+	var ipt = document.getElementById("upload_trigger")
+	ipt.onchange = onChange
+
+	function onChange(ev) {
+		const files = ev.target.files
+		const file = files[files.length - 1]
+		if (!file) return
+		// form-data 形式上传文件
+		// upload_file_handler(file)
+		// stream形式上传文件
+		upload_handler(file)
+	}
+
+	async function upload_file_handler(file) {
+		const formData = new FormData()
+		formData.append("file", file)
+
+		const request = new Request("https://localhost:3000/upload_file", {
+			method: "POST",
+			body: formData
+		})
+
+		const res = await fetch(request)
+		if (res.ok) {
+			console.log("File uploaded successfully")
+		} else {
+			console.error("File upload failed")
+		}
+	}
+
+	async function upload_handler(file) {
+		const progressBar = document.getElementById("progressBar")
+		const totalSize = file.size
+		let uploadedSize = 0
+		const stream = new ReadableStream({
+			start(controller) {
+				const reader = file.stream()?.getReader()
+				const push = async () => {
+					const { done, value } = await reader.read()
+					if (done) {
+						controller.close()
+						return
+					}
+					controller.enqueue(value)
+					uploadedSize += value.length
+					progressBar.value = (uploadedSize / totalSize) * 100
+					await push()
+				}
+				push()
+			}
+		})
+
+		const headers = new Headers()
+		headers.append("Content-Type", "application/octet-stream")
+		headers.append("File-Name", encodeURIComponent(file.name))
+		const response = await fetch("https://localhost:3000/upload_stream", {
+			method: "POST",
+			headers: headers,
+			body: stream,
+			duplex: "half"
+		})
+
+		if (response.ok) {
+			console.log("File uploaded successfully")
+		} else {
+			console.error("File upload failed")
+		}
+	}
+
+	const download_btn = document.getElementById("download_btn")
+	download_btn.addEventListener("click", () => {
+		download_file("https://localhost:3000/public/test.mp4")
+	})
+
+
+	async function download_file(url) {
+		const progressBar = document.getElementById("progressBar")
+		const res = await fetch(url)
+
+		const reader = res.body.getReader()
+		const contentLength = res.headers.get("Content-Length")
+		let receivedSize = 0
+		const chunks = []
+		const totalSize = parseInt(contentLength, 10)
+
+		const stream = new ReadableStream({
+			start(controller) {
+				function push() {
+					reader.read().then(({ done, value }) => {
+						if (done) {
+							controller.close()
+							return
+						}
+						chunks.push(value)
+						receivedSize += value.length
+						progressBar.value = (receivedSize / totalSize) * 100
+						controller.enqueue(value)
+						push()
+					})
+				}
+
+				push()
+			}
+		})
+
+		return new Response(stream)
+	}
+</script>
+</body>
+</html>
