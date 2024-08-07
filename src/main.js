@@ -105,9 +105,9 @@ app.use("/public", static(path.join(__dirname, "uploads")))
 spdy.createServer(
 	{
 		key: fs.readFileSync(
-			path.join(__dirname, "certs", "localhost-key.pem"),
+			path.join(__dirname, "certs", "localhost-key.pem"), // 获取密钥路径，创建密钥参考`README.md`
 		),
-		cert: fs.readFileSync(path.join(__dirname, "certs", "localhost.pem")),
+		cert: fs.readFileSync(path.join(__dirname, "certs", "localhost.pem")), // 获取密钥路径,创建密钥参考`README.md`
 	},
 	app,
 ).listen(PORT, () => {
